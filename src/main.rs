@@ -13,10 +13,10 @@ extern crate serde_derive;
 use palette::blend::Blend;
 use palette::Mix;
 use rand::distributions::Distribution;
+use rand::SeedableRng;
 use rumqtt::{MqttCallback, MqttClient, MqttOptions, QoS};
 use std::sync::{Arc, RwLock};
 use std::thread;
-use std::time::Duration;
 
 trait Device {
     type Config: serde::Serialize;
@@ -263,18 +263,21 @@ fn main() {
             let mut mote = mote::Mote::new("/dev/ttyACM0", true);
             mote.clear();
 
-            let mut rng = rand::thread_rng();
+            // We don't need actual entropy, so use a pseudo-random generator.
+            let mut rng = rand::prng::XorShiftRng::from_seed([
+                14, 12, 19, 88, 42, 13, 11, 1, 42, 198, 122, 23, 44, 71, 22, 83,
+            ]);
 
             let mut n = 0u64;
             loop {
-                let mut interval = std::time::Duration::from_millis(50);
+                let interval;
                 {
                     let mut light = background_light.write().unwrap();
                     interval = std::time::Duration::from_millis(1000 / light.rate as u64);
 
                     let decay = 1.0 * light.decay as f32 / 255.0;
 
-                    let dist = rand::distributions::Poisson::new(2.0 * light.lambda as f64);
+                    let dist = rand::distributions::Poisson::new(2.0 * light.lambda as f64 / 255.0);
                     for i in 0..light.segments.len() {
                         let mut segment = &mut light.segments[i];
                         if dist.sample(&mut rng) > 1 {
@@ -297,7 +300,7 @@ fn main() {
                         .collect::<Vec<_>>();
                     mote.write(&to_array(&pixels.iter().map(to_rgb).collect::<Vec<_>>()));
                 }
-                std::thread::sleep(std::time::Duration::from_millis(50));
+                std::thread::sleep(interval);
                 n += 1;
             }
         });
