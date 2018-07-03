@@ -173,6 +173,7 @@ fn main() {
     opts.optopt("", "mqtt_broker_address", "", "");
     opts.optopt("", "mqtt_broker_username", "", "");
     opts.optopt("", "mqtt_broker_password", "", "");
+    opts.optopt("", "device", "", "");
     let matches = opts.parse(std::env::args()).unwrap();
 
     let light = Arc::new(RwLock::new(Light {
@@ -257,10 +258,14 @@ fn main() {
         });
         */
 
+        let device = matches
+            .opt_str("device")
+            .unwrap_or("/dev/ttyACM0".to_string());
+
         let background_light = light.clone();
         thread::spawn(move || {
             println!("start");
-            let mut mote = mote::Mote::new("/dev/ttyACM0", true);
+            let mut mote = mote::Mote::new(&device, true);
             mote.clear();
 
             // We don't need actual entropy, so use a pseudo-random generator.
